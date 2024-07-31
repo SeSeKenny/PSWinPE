@@ -22,7 +22,7 @@ jobs:
 
     - name: Generate ISO
       run: |
-        pwsh ./generateiso.ps1 -adkInstallPath C:\adk -peSourcePath C:\pe
+        powershell ./generateiso.ps1 -adkInstallPath C:\adk -peSourcePath C:\pe
 
     - name: Get ADK Version
       id: get-version
