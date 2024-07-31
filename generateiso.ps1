@@ -1,4 +1,5 @@
-$adkInstallPath = ".\adk"
+$adkfoldername='adk'
+$adkInstallPath = ".\$adkfoldername"
 $peSourcePath = ".\pe"
 $mountPath = "$peSourcePath\mount"
 $isoOutputPath = "$peSourcePath\WinPE.iso"
@@ -57,11 +58,10 @@ foreach ($link in $pageContent.Links) {
 
 # Output the ADK version to a file
 $adkVersionFile = "$peSourcePath\adk_version.txt"
-$latestAdkVersion.ToString() | Out-File -FilePath $adkVersionFile
 
 # Download paths for ADK and WinPE installers
-$adkInstallerPath = "$env:TEMP\adksetup.exe"
-$winpeInstallerPath = "$env:TEMP\adkwinpesetup.exe"
+$adkInstallerPath = ".\adksetup.exe"
+$winpeInstallerPath = ".\adkwinpesetup.exe"
 
 # Download the ADK installer
 Invoke-WebRequest -Uri $latestAdkLink -OutFile $adkInstallerPath
@@ -70,10 +70,10 @@ Invoke-WebRequest -Uri $latestAdkLink -OutFile $adkInstallerPath
 Invoke-WebRequest -Uri $latestWinpeLink -OutFile $winpeInstallerPath
 
 # Install Windows ADK silently
-Start-Process -FilePath $adkInstallerPath -ArgumentList "/quiet", "/norestart", "/installpath", $adkInstallPath -Wait
+& $adkInstallerPath /quiet /norestart /installpath "$((Get-Item .).FullName)\$adkfoldername" | Out-Null
 
 # Install Windows PE add-on silently
-Start-Process -FilePath $winpeInstallerPath -ArgumentList "/quiet", "/norestart", "/installpath", $adkInstallPath -Wait
+& $winpeInstallerPath /quiet /norestart /installpath "$((Get-Item .).FullName)\$adkfoldername" | Out-Null
 
 # Clean up downloaded installers
 Remove-Item -Path $adkInstallerPath, $winpeInstallerPath -Force
@@ -86,6 +86,7 @@ $winpeWim = "$winpeArchPath\WinPE.wim"
 
 # Create the WinPE directory structure
 New-Item -ItemType Directory -Path $mountPath, $winpeMediaPath, $isoRoot, $bootDir, $efiDir, $sourcesDir -Force
+$latestAdkVersion.ToString() | Out-File -FilePath $adkVersionFile
 
 # Copy the base WinPE files
 Copy-Item -Path "$winpeArchPath\Media\*" -Destination $winpeMediaPath -Recurse -Force
@@ -110,8 +111,8 @@ foreach ($package in $winpeOptionalPackages) {
 Write-Output "PowerShell package has been added to the new Windows PE image."
 
 # Download paths for Explorer++ and Firefox installer
-$explorerPlusPlusZipPath = "$env:TEMP\ExplorerPlusPlus.zip"
-$explorerPlusPlusExtractPath = "$env:TEMP\ExplorerPlusPlus"
+$explorerPlusPlusZipPath = ".\ExplorerPlusPlus.zip"
+$explorerPlusPlusExtractPath = ".\ExplorerPlusPlus"
 $firefoxInstallerPath = "$mountPath\windows\system32\firefox_installer.exe"
 $browserBatchPath = "$mountPath\windows\system32\browser.bat"
 
