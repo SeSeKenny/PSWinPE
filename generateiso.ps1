@@ -1,6 +1,6 @@
-$adkInstallPath = ".\adk",
-$peSourcePath = ".\pe",
-$mountPath = "$peSourcePath\mount",
+$adkInstallPath = ".\adk"
+$peSourcePath = ".\pe"
+$mountPath = "$peSourcePath\mount"
 $isoOutputPath = "$peSourcePath\WinPE.iso"
 
 # Set progress preference to silently continue
