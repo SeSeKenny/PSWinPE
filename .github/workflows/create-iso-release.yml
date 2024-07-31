@@ -19,17 +19,17 @@ jobs:
 
     - name: Generate ISO
       run: |
-        powershell ./generateiso.ps1 -adkInstallPath C:\adk -peSourcePath C:\pe
+        powershell .\generateiso.ps1
 
     - name: Get ADK Version
       id: get-version
       run: |
-        echo "::set-output name=adk_version::$(cat C:\pe\adk_version.txt)"
+        echo "::set-output name=adk_version::$(cat .\adk_version.txt)"
 
     - name: Upload ISO to Release
       uses: softprops/action-gh-release@v1
       with:
-        files: C:\pe\WinPE_${{ steps.get-version.outputs.adk_version }}.iso
+        files: .\pe\WinPE_${{ steps.get-version.outputs.adk_version }}.iso
       env:
         TAG_NAME: "v${{ steps.get-version.outputs.adk_version }}"
         RELEASE_NAME: "WinPE ISO ${{ steps.get-version.outputs.adk_version }}"
