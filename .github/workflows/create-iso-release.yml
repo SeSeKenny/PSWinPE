@@ -13,10 +13,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Install required tools
-      run: |
-        choco install -y 7zip
-
     - name: Generate ISO
       run: |
         powershell .\generateiso.ps1
