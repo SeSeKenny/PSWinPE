@@ -1,0 +1,38 @@
+name: Create Bootable ISO and Publish Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up PowerShell
+      uses: actions/setup-pwsh@v2
+
+    - name: Install required tools
+      run: |
+        choco install -y 7zip
+
+    - name: Generate ISO
+      run: |
+        pwsh ./generateiso.ps1 -adkInstallPath C:\adk -peSourcePath C:\pe
+
+    - name: Get ADK Version
+      id: get-version
+      run: |
+        echo "::set-output name=adk_version::$(cat C:\pe\adk_version.txt)"
+
+    - name: Upload ISO to Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: C:\pe\WinPE_${{ steps.get-version.outputs.adk_version }}.iso
+      env:
+        TAG_NAME: "v${{ steps.get-version.outputs.adk_version }}"
+        RELEASE_NAME: "WinPE ISO ${{ steps.get-version.outputs.adk_version }}"
