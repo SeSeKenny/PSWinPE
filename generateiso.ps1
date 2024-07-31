@@ -1,16 +1,14 @@
-param(
-    [string]$adkInstallPath = "C:\adk",
-    [string]$peSourcePath = "C:\pe",
-    [string]$mountPath = "$peSourcePath\mount",
-    [string]$isoOutputPath = "$peSourcePath\WinPE.iso"
-)
+$adkInstallPath = ".\adk",
+$peSourcePath = ".\pe",
+$mountPath = "$peSourcePath\mount",
+$isoOutputPath = "$peSourcePath\WinPE.iso"
 
 # Set progress preference to silently continue
 $ProgressPreference = 'SilentlyContinue'
 
 # Define paths
 $winpeMediaPath = "$peSourcePath\WinPE_amd64"
-$isoRoot = "$env:TEMP\ISO"
+$isoRoot = ".\ISO"
 $bootDir = "$isoRoot\boot"
 $efiDir = "$isoRoot\efi"
 $sourcesDir = "$isoRoot\sources"
