@@ -105,11 +105,12 @@ New-Item -ItemType Directory -Path $mountPath, $winpeMediaPath, $isoRoot, $bootD
 $latestAdkVersion.ToString() | Out-File -FilePath $adkVersionFile
 
 # Copy the base WinPE files
-$newscript=(cat "$winpePath\copype.cmd") -replace '%WinPERoot%',$(Get-Item $winpePath).FullName -replace '%OSCDImgRoot%\\\.\.\\\.\.',$windeploypath  -join "`n"
+$newscript=(Get-Content "$winpePath\copype.cmd") -replace '%WinPERoot%',$(Get-Item $winpePath).FullName -replace '%OSCDImgRoot%\\\.\.\\\.\.',$windeploypath  -join "`n"
 $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
 [System.IO.File]::WriteAllText("$PWD\pe\copype.cmd", $newscript, $Utf8NoBomEncoding)
 & ".\pe\copype.cmd" $winpeArch $peSourcePath\copied
-mv $peSourcePath\copied\media\* $winpeMediaPath
+Move-Item $peSourcePath\copied\media\* $winpeMediaPath
+Move-Item $peSourcePath\copied\fwfiles\* $winpeMediaPath
 
 
 # Mount the WinPE image
@@ -155,20 +156,60 @@ Write-Output "Explorer++ has been downloaded and extracted to $mountPath\windows
 Invoke-WebRequest -Uri $firefoxInstallerUrl -OutFile $firefoxInstallerPath
 
 # Create the batch file to run the Firefox installer silently
-$browserBatchContent = "@echo off`n$firefoxInstallerPath /S"
+@'
+# Define the URL of the PortableApps Firefox Portable page
+$url = "https://portableapps.com/apps/internet/firefox_portable"
+
+# Create a web session
+$webSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+
+# Use Invoke-WebRequest with -UseBasicParsing and the web session to get the HTML content of the page
+$response = Invoke-WebRequest -Uri $url -UseBasicParsing -WebSession $webSession
+
+# Find the download link within the response links
+$downloadLink = $response.Links | Where-Object { $_.href -match 'FirefoxPortable_\d+\.\d+\.\d+_English\.paf\.exe' } | Select-Object -First 1
+
+if ($downloadLink) {
+    # Define the prefix for the href attribute
+    $prefix = "https://portableapps.com"
+
+    # Unescape the href attribute to replace &amp; with &
+    $waitPageUrl = $prefix + [System.Net.WebUtility]::HtmlDecode($downloadLink.href)
+
+    # Request the wait page to initiate the download
+    $waitResponse = Invoke-WebRequest -Uri $waitPageUrl -UseBasicParsing -WebSession $webSession
+
+    # Find the actual download link from the wait page response
+    $actualDownloadLink = $waitResponse.Links | Where-Object { $_.href -match 'FirefoxPortable_\d+\.\d+\.\d+_English\.paf\.exe' } | Select-Object -First 1
+
+    if ($actualDownloadLink) {
+        $downloadUrl = $prefix + [System.Net.WebUtility]::HtmlDecode($actualDownloadLink.href)
+
+        # Define the destination path for the download
+        $destinationPath = ".\ff.exe"
+
+        # Download the file using Invoke-WebRequest with -UseBasicParsing and the web session
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $destinationPath -UseBasicParsing -WebSession $webSession
+
+        Write-Output "Downloaded Firefox Portable to $destinationPath"
+    } else {
+        Write-Output "Actual download link not found."
+    }
+} else {
+    Write-Output "Download link not found."
+}
+'@ | Out-File "$browserBatchPath.ps1"
+$browserBatchContent = "@echo off`npowershell.exe -executionpolicy bypass -file `"$browserBatchPath.ps1`""
 Set-Content -Path $browserBatchPath -Value $browserBatchContent -Force
 
 Write-Output "Firefox web installer has been downloaded and browser.bat has been created in $mountPath\windows\system32."
 
+dism.exe /set-scratchspace:8192 /image:$mountPath
 # Commit the changes and unmount the image
 Dismount-WindowsImage -Path $mountPath -Save
-
-# Copy the updated WinPE.wim to the media folder
-Copy-Item -Path $winpeWim -Destination "$sourcesDir\boot.wim" -Force
 
 # Generate the bootable ISO using oscdimg
 $oscdimgPath = "$adkInstallPath\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe"
 $isoOutputPath = "$peSourcePath\WinPE_$($latestAdkVersion.ToString()).iso"
-Start-Process -FilePath $oscdimgPath -ArgumentList "-b$isoRoot\etfsboot.com", "-u2", "-h", "-m", "-o", "-udfver102", "-lWinPE", $isoRoot, $isoOutputPath -Wait
-
+Invoke-Expression "& `"$oscdimgPath`" -bootdata:2#p0,e,b$((Get-Item $isoRoot).FullName)\etfsboot.com#pEF,e,b$((Get-Item $isoRoot).FullName)\efisys.bin -u2 -h -m -o -udfver102 -lWinPE $isoRoot $isoOutputPath"
 Write-Output "Bootable ISO has been created at $isoOutputPath."
