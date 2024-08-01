@@ -9,14 +9,21 @@ $ProgressPreference = 'SilentlyContinue'
 
 # Define paths
 $winpeMediaPath = "$peSourcePath\WinPE_amd64"
-$isoRoot = ".\ISO"
+$isoRoot = "$winpeMediaPath"
 $bootDir = "$isoRoot\boot"
 $efiDir = "$isoRoot\efi"
 $sourcesDir = "$isoRoot\sources"
 
+# Define paths for WinPE files
+$winpePath = "$adkInstallPath\Assessment and Deployment Kit\Windows Preinstallation Environment"
+$winpeArch = "amd64"
+$winpeArchPath = "$winpePath\$winpeArch"
+$winpesourceWim = "$winpeArchPath\en-us\WinPE.wim"
+$winpeWim="$peSourcePath\WinPE.wim"
+
 # Define URLs
 $adkPageUrl = "https://learn.microsoft.com/en-us/windows-hardware/get-started/adk-install"
-$explorerPlusPlusUrl = "https://github.com/derceg/explorerplusplus/releases/latest/download/Explorer++.zip"
+$explorerPlusPlusUrl = "https://download.explorerplusplus.com/dev/latest/explorerpp_x64.zip"
 $firefoxInstallerUrl = "https://download.mozilla.org/?product=firefox-latest-ssl&os=win64&lang=en-US"
 
 # Function to extract version number from a string
@@ -78,25 +85,19 @@ Invoke-WebRequest -Uri $latestWinpeLink -OutFile $winpeInstallerPath
 # Clean up downloaded installers
 Remove-Item -Path $adkInstallerPath, $winpeInstallerPath -Force
 
-# Define paths for WinPE files
-$winpePath = "$adkInstallPath\Assessment and Deployment Kit\Windows Preinstallation Environment"
-$winpeArch = "amd64"
-$winpeArchPath = "$winpePath\$winpeArch"
-$winpeWim = "$winpeArchPath\WinPE.wim"
-
 # Create the WinPE directory structure
 New-Item -ItemType Directory -Path $mountPath, $winpeMediaPath, $isoRoot, $bootDir, $efiDir, $sourcesDir -Force
 $latestAdkVersion.ToString() | Out-File -FilePath $adkVersionFile
 
 # Copy the base WinPE files
-Copy-Item -Path "$winpeArchPath\Media\*" -Destination $winpeMediaPath -Recurse -Force
+& "$winpePath\copype.cmd" $winpeArch $peSourcePath
 
 # Mount the WinPE image
-Dismount-WindowsImage -Path $mountPath -Discard -ErrorAction Ignore
-Mount-WindowsImage -ImagePath $winpeWim -Index 1 -MountPath $mountPath
+Dismount-WindowsImage -Path $mountPath -Discard -ErrorAction SilentlyContinue
+Mount-WindowsImage -ImagePath $winpeWim -Index 1 -Path $mountPath
 
 # Add PowerShell to the WinPE image
-$packagesPath = "$adkInstallPath\Assessment and Deployment Kit\Windows Preinstallation Environment\Packages"
+$packagesPath = "$winpeArchPath\WinPE_OCs"
 $winpeOptionalPackages = @(
     "$packagesPath\WinPE-WMI.cab",
     "$packagesPath\WinPE-NetFX.cab",
@@ -111,13 +112,10 @@ foreach ($package in $winpeOptionalPackages) {
 Write-Output "PowerShell package has been added to the new Windows PE image."
 
 # Download paths for Explorer++ and Firefox installer
-$explorerPlusPlusZipPath = ".\ExplorerPlusPlus.zip"
-$explorerPlusPlusExtractPath = ".\ExplorerPlusPlus"
+$explorerPlusPlusZipPath = "$peSourcePath\ExplorerPlusPlus.zip"
+$explorerPlusPlusExtractPath = "$peSourcePath\ExplorerPlusPlus"
 $firefoxInstallerPath = "$mountPath\windows\system32\firefox_installer.exe"
 $browserBatchPath = "$mountPath\windows\system32\browser.bat"
-
-# Create necessary directories
-New-Item -ItemType Directory -Path $explorerPlusPlusExtractPath -Force
 
 # Download the latest Explorer++ zip file
 Invoke-WebRequest -Uri $explorerPlusPlusUrl -OutFile $explorerPlusPlusZipPath
@@ -146,20 +144,7 @@ Write-Output "Firefox web installer has been downloaded and browser.bat has been
 Dismount-WindowsImage -Path $mountPath -Save
 
 # Copy the updated WinPE.wim to the media folder
-Copy-Item -Path "$winpeArchPath\WinPE.wim" -Destination "$winpeMediaPath\sources\boot.wim" -Force
-
-# Copy the customized WinPE.wim to the sources directory
-Copy-Item -Path "$winpeMediaPath\sources\boot.wim" -Destination "$sourcesDir\boot.wim" -Force
-
-# Copy boot files from the ADK installation
-Copy-Item -Path "$adkInstallPath\Assessment and Deployment Kit\Deployment Tools\amd64\DISM\boot\boot.sdi" -Destination $bootDir -Force
-Copy-Item -Path "$adkInstallPath\Assessment and Deployment Kit\Deployment Tools\amd64\DISM\boot\etfsboot.com" -Destination $isoRoot -Force
-
-# Copy EFI files from the ADK installation
-Copy-Item -Path "$adkInstallPath\Assessment and Deployment Kit\Deployment Tools\amd64\DISM\efi\microsoft\boot" -Destination $efiDir -Recurse -Force
-
-# Copy additional boot files
-Copy-Item -Path "$adkInstallPath\Assessment and Deployment Kit\Deployment Tools\amd64\DISM\boot\bootfix.bin" -Destination $bootDir -Force
+Copy-Item -Path $winpeWim -Destination "$sourcesDir\boot.wim" -Force
 
 # Generate the bootable ISO using oscdimg
 $oscdimgPath = "$adkInstallPath\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe"
