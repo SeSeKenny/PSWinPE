@@ -16,10 +16,11 @@ $sourcesDir = "$isoRoot\sources"
 
 # Define paths for WinPE files
 $winpePath = "$adkInstallPath\Assessment and Deployment Kit\Windows Preinstallation Environment"
+$windeploypath="$adkfoldername\Assessment and Deployment Kit\Deployment Tools"
 $winpeArch = "amd64"
 $winpeArchPath = "$winpePath\$winpeArch"
 $winpesourceWim = "$winpeArchPath\en-us\WinPE.wim"
-$winpeWim="$peSourcePath\WinPE.wim"
+$winpeWim="$peSourcePath\WinPE_amd64\sources\boot.wim"
 
 # Define URLs
 $adkPageUrl = "https://learn.microsoft.com/en-us/windows-hardware/get-started/adk-install"
@@ -82,15 +83,34 @@ Invoke-WebRequest -Uri $latestWinpeLink -OutFile $winpeInstallerPath
 # Install Windows PE add-on silently
 & $winpeInstallerPath /quiet /norestart /installpath "$((Get-Item .).FullName)\$adkfoldername" | Out-Null
 
-# Clean up downloaded installers
-Remove-Item -Path $adkInstallerPath, $winpeInstallerPath -Force
+$AdkCount=1
+while (!(Test-Path $windeploypath) -and $AdkCount -le 3) {
+& $adkInstallerPath /quiet /repair | Out-Null
+    $AdkCount++
+}
+
+$AdkPeCount=1
+while (!(Test-Path $winpePath) -and $AdkPeCount -le 3) {
+& $winpeInstallerPath /quiet /repair | Out-Null
+    $AdkPeCount++
+}
+
+if ($AdkCount -ge 4 -or $AdkPeCount -ge 4) {
+    Write-Error "ADK Failed to install"
+    exit 1
+}
 
 # Create the WinPE directory structure
 New-Item -ItemType Directory -Path $mountPath, $winpeMediaPath, $isoRoot, $bootDir, $efiDir, $sourcesDir -Force
 $latestAdkVersion.ToString() | Out-File -FilePath $adkVersionFile
 
 # Copy the base WinPE files
-& "$winpePath\copype.cmd" $winpeArch $peSourcePath
+$newscript=(cat "$winpePath\copype.cmd") -replace '%WinPERoot%',$(Get-Item $winpePath).FullName -replace '%OSCDImgRoot%\\\.\.\\\.\.',$windeploypath  -join "`n"
+$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
+[System.IO.File]::WriteAllText("$PWD\pe\copype.cmd", $newscript, $Utf8NoBomEncoding)
+& ".\pe\copype.cmd" $winpeArch $peSourcePath\copied
+mv $peSourcePath\copied\media\* $winpeMediaPath
+
 
 # Mount the WinPE image
 Dismount-WindowsImage -Path $mountPath -Discard -ErrorAction SilentlyContinue
